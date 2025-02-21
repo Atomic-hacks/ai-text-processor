@@ -135,7 +135,7 @@ const TextProcessor = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col items-center">
+    <div className="min-h-screen bg-gradient-to-br from-black via-neutral-950 to-gray-900 text-white flex flex-col items-center">
       <AnimatePresence>
         {showIntro && (
           <motion.div 
@@ -152,7 +152,7 @@ const TextProcessor = () => {
               className="relative w-full max-w-2xl mx-4 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-900 to-emerald-700 p-1"
             >
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJncmlkIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0gMjAgMCBMIDAgMCAwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30"></div>
-              <div className="relative bg-gray-900 rounded-xl overflow-hidden p-8">
+              <div className="relative bg-black rounded-xl overflow-hidden p-8">
                 <div className="absolute top-0 left-0 w-full h-1">
                   <div className="h-full bg-gradient-to-r from-emerald-400 via-blue-500 to-purple-500"></div>
                 </div>
@@ -190,7 +190,7 @@ const TextProcessor = () => {
                           hidden: { opacity: 0, y: 10 },
                           visible: { opacity: 1, y: 0 }
                         }}
-                        className="flex items-center p-4 bg-gray-800/60 rounded-lg"
+                        className="flex items-center p-4 bg-gray-800/60 opacity-80 backdrop-blur-xl rounded-lg"
                       >
                         <div className="p-2 mr-4 bg-emerald-500/20 rounded-full text-emerald-400">
                           <Sparkles className="w-5 h-5" />
@@ -206,7 +206,7 @@ const TextProcessor = () => {
                           hidden: { opacity: 0, y: 10 },
                           visible: { opacity: 1, y: 0 }
                         }}
-                        className="flex items-center p-4 bg-gray-800/60 rounded-lg"
+                        className="flex items-center p-4 bg-gray-800/60  opacity-80 backdrop-blur-xl rounded-lg"
                       >
                         <div className="p-2 mr-4 bg-blue-500/20 rounded-full text-blue-400">
                           <Type className="w-5 h-5" />
@@ -222,14 +222,14 @@ const TextProcessor = () => {
                           hidden: { opacity: 0, y: 10 },
                           visible: { opacity: 1, y: 0 }
                         }}
-                        className="flex items-center p-4 bg-gray-800/60 rounded-lg"
+                        className="flex items-center p-4 bg-gray-800/60 opacity-40 backdrop-blur-3xl rounded-lg"
                       >
                         <div className="p-2 mr-4 bg-purple-500/20 rounded-full text-purple-400">
                           <MessageSquare className="w-5 h-5" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-200">Intuitive Interface</h3>
-                          <p className="text-sm text-gray-400">you probably thought i spelt spanish wrong and if you didnt notice you just checked, anyways i dont even know what intuitive means lmao just see what that does yourself, i have deadline can&apos;t be googling the meaning of these words</p>
+                          <h3 className="font-medium text-gray-200">Intuitive Interface and Language detetction</h3>
+                          <p className="text-sm text-gray-400">you probably thought i spelt spanish wrong and if you didnt notice you just checked, anyways i dont even know what intuitive means lmao just see what that does yourself, i have a deadline can&apos;t be googling the meaning of these words (bet you didnt realize dtection was spelt wrong to, slow ?)</p>
                         </div>
                       </motion.div>
                     </motion.div>
@@ -263,7 +263,7 @@ const TextProcessor = () => {
               <Languages className="w-5 h-5" />
             </div>
             <h1 className="text-lg font-medium bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-blue-500">
-              AI Text Processor
+              Atomic did Something
             </h1>
           </div>
           
@@ -332,7 +332,7 @@ const TextProcessor = () => {
               </div>
               <h2 className="text-xl font-medium text-gray-200 mb-2">Start a new conversation</h2>
               <p className="text-gray-400 max-w-md">
-                Enter text below to begin. You can summarize or translate your text with just a click.
+                Enter text below to begin. You can summarize or translate your text with just a click. Also i carry God beg you keep your prompts simple, i won&apos;t be responsible for any issues you encounter if you don&apos;t, some of una nor dey hear word
               </p>
             </motion.div>
           )}

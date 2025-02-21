@@ -116,9 +116,9 @@ const MessageComponent: React.FC<MessageComponentProps> = ({ message, onUpdate }
       transition={{ duration: 0.4 }}
       className="group relative bg-gray-800/90 border border-gray-700 rounded-xl overflow-hidden"
     >
-      <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/40 to-blue-500/40"></div>
+      <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-black to-blue-600"></div>
       
-      <div className="p-3 sm:p-5">
+      <div className="p-3 sm:p-5 bg-black/35">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-gray-700 rounded-md">

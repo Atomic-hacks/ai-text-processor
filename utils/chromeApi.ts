@@ -4,7 +4,7 @@
 /**
  * Service for language detection, translation, and summarization operations
  * using browser built-in AI capabilities when available, with robust fallbacks
- * shey you see how fancy it sounds lmao, i was stuck while doing the fallbacks and i didnt have time, so i used ai for that make una nor deduct mark abeg i have lost enough already 
+ * shey you see how fancy it sounds lmao, i was stuck while doing the fallbacks and i didnt have time, so i used ai for that kind of choppy but it does the job 
  */
 
 import { LANGUAGES } from './data/language-data';

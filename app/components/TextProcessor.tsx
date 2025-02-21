@@ -1,6 +1,4 @@
-//as you are going through my code any mistake you see just close eye and pass abeg, i no sabi code i just dey try.
 "use client";
-
 import React, { useState, useRef, useEffect } from "react";
 import {
   Languages,
@@ -16,46 +14,47 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { LANGUAGES } from "../../utils/data/language-data";
 import MessageComponent, { Message } from "./Message";
-import { detectLanguage } from "../../utils/chromeApi";
+import {
+  detectLanguage,
+  translateText,
+  summarizeText,
+} from "../../utils/chromeApi";
 
 const TextProcessor = () => {
-  // State management
+  // Core state management
   const [showIntro, setShowIntro] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [language, setLanguage] = useState(LANGUAGES[0]);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState(LANGUAGES[0]);
   const [isAutoDetect, setIsAutoDetect] = useState(true);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
- 
+  // Handle click outside dropdown
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setDropdownOpen(false);
       }
-    }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
- 
+  // Auto-scroll to bottom when messages update
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Handle textarea auto-resize
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
@@ -66,45 +65,43 @@ const TextProcessor = () => {
     }
   }, [inputText]);
 
- 
+  // Focus input after intro closes
   useEffect(() => {
     if (!showIntro && inputRef.current) {
       inputRef.current.focus();
     }
   }, [showIntro]);
 
-  // Auto-detect language when input changes and auto-detect is enabled, very smart something i did here 
+  // Auto-detect language with debounce
   useEffect(() => {
     const detectInputLanguage = async () => {
-      if (isAutoDetect && inputText.trim().length > 5) {
-        try {
-          const detectedCode = await detectLanguage(inputText);
-          const detectedLang = LANGUAGES.find(
-            (lang) => lang.code === detectedCode
-          );
-          if (detectedLang && detectedLang.code !== language.code) {
-            setLanguage(detectedLang);
-          }
-        } catch (error) {
-          console.error("Language detection failed:", error);
+      if (!isAutoDetect || inputText.trim().length <= 5) return;
+
+      try {
+        const detectedCode = await detectLanguage(inputText);
+        const detectedLang = LANGUAGES.find(
+          (lang) => lang.code === detectedCode
+        );
+
+        if (detectedLang && detectedLang.code !== selectedLanguage.code) {
+          setSelectedLanguage(detectedLang);
         }
+      } catch (error) {
+        console.error("Language detection failed:", error);
       }
     };
 
-    // Use debounce to avoid excessive API calls
-    const timeoutId = setTimeout(detectInputLanguage, 500);
-    return () => clearTimeout(timeoutId);
-  }, [inputText, isAutoDetect, language.code]);
+    const debounceTimeout = setTimeout(detectInputLanguage, 500);
+    return () => clearTimeout(debounceTimeout);
+  }, [inputText, isAutoDetect, selectedLanguage.code]);
 
   const handleSendMessage = async () => {
     if (inputText.trim() === "" || isLoading) return;
-
     setIsLoading(true);
 
     try {
-      let msgLanguage = language.code;
+      let messageLanguage = selectedLanguage.code;
 
-      // Final language detection check
       if (isAutoDetect) {
         try {
           const detectedCode = await detectLanguage(inputText);
@@ -112,7 +109,7 @@ const TextProcessor = () => {
             detectedCode &&
             LANGUAGES.some((lang) => lang.code === detectedCode)
           ) {
-            msgLanguage = detectedCode;
+            messageLanguage = detectedCode;
           }
         } catch (error) {
           console.warn("Send-time language detection failed:", error);
@@ -122,18 +119,42 @@ const TextProcessor = () => {
       const newMessage: Message = {
         id: Date.now(),
         text: inputText,
-        language: msgLanguage,
+        language: messageLanguage,
         processed: [],
         timestamp: Date.now(),
       };
 
-      setMessages([...messages, newMessage]);
-      setInputText("");
+      // Process translations and summaries concurrently
+      const [translatedText, summarizedText] = await Promise.all([
+        translateText(inputText, messageLanguage, selectedLanguage.code),
+        summarizeText(inputText, { type: "key-points", format: "markdown" }),
+      ]);
 
+      newMessage.processed = [
+        {
+          type: "translation",
+          text: translatedText,
+          id: "",
+          content: "",
+          timestamp: 0,
+        },
+        {
+          type: "summary",
+          text: summarizedText,
+          id: "",
+          content: "",
+          timestamp: 0,
+        },
+      ];
+
+      setMessages((prev) => [...prev, newMessage]);
+      setInputText("");
 
       if (inputRef.current) {
         inputRef.current.style.height = "auto";
       }
+    } catch (error) {
+      console.error("Message processing failed:", error);
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +174,7 @@ const TextProcessor = () => {
   };
 
   return (
-    <div className="relative bg-gradient-to-br from-black via-neutral-950 to-gray-900 text-white flex flex-col items-center">
+    <div className="relative bg-gradient-to-br from-black via-neutral-950 to-gray-900 text-white flex flex-col items-center min-h-screen">
       <AnimatePresence>
         {showIntro && (
           <motion.div
@@ -169,7 +190,6 @@ const TextProcessor = () => {
               transition={{ delay: 0.2, duration: 0.5 }}
               className="relative w-full max-w-md mx-auto my-4 rounded-2xl bg-gradient-to-br from-emerald-900 to-emerald-700"
             >
-              <div className="absolute inset-0 opacity-30"></div>
               <div className="relative bg-black/90 rounded-xl overflow-hidden p-5 sm:p-8">
                 <div className="absolute top-0 left-0 w-full h-1">
                   <div className="h-full bg-gradient-to-r from-emerald-400 via-blue-500 to-purple-500"></div>
@@ -198,9 +218,7 @@ const TextProcessor = () => {
                         hidden: { opacity: 0 },
                         visible: {
                           opacity: 1,
-                          transition: {
-                            staggerChildren: 0.15,
-                          },
+                          transition: { staggerChildren: 0.15 },
                         },
                       }}
                     >
@@ -274,7 +292,7 @@ const TextProcessor = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setShowIntro(false)}
-                      className="mt-6 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-back/50 text-white font-medium flex items-center justify-center group text-sm sm:text-base"
+                      className="mt-6 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-blue-500 text-white font-medium flex items-center justify-center group text-sm sm:text-base"
                     >
                       Click the button Unc/aunt
                       <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -329,8 +347,8 @@ const TextProcessor = () => {
                 className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-750 text-sm"
                 disabled={isAutoDetect}
               >
-                <span>{language.flag}</span>
-                <span>{language.name}</span>
+                <span>{selectedLanguage.flag}</span>
+                <span>{selectedLanguage.name}</span>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
 
@@ -340,18 +358,18 @@ const TextProcessor = () => {
                     <button
                       key={lang.code}
                       className={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-gray-700 ${
-                        lang.code === language.code
+                        lang.code === selectedLanguage.code
                           ? "bg-gray-700/50 text-emerald-400"
                           : "text-gray-200"
                       }`}
                       onClick={() => {
-                        setLanguage(lang);
+                        setSelectedLanguage(lang);
                         setDropdownOpen(false);
                       }}
                     >
                       <span className="w-6 text-center">{lang.flag}</span>
                       <span>{lang.name}</span>
-                      {lang.code === language.code && (
+                      {lang.code === selectedLanguage.code && (
                         <Check className="w-4 h-4 ml-auto" />
                       )}
                     </button>
@@ -390,8 +408,10 @@ const TextProcessor = () => {
                 Start a new conversation
               </h2>
               <p className="text-sm text-gray-400 max-w-md px-4">
-                Enter your text below to begin. You can summarize or translate your
-                text by tapping the send button or hitting enter since you are lazy. Keep prompts simple for best results. If you like nor keep am simple na you sabi!
+                Enter your text below to begin. You can summarize or translate
+                your text by tapping the send button or hitting enter since you
+                are lazy. Keep prompts simple for best results. If you like nor
+                keep am simple na you sabi!
               </p>
             </motion.div>
           )}
@@ -424,7 +444,9 @@ const TextProcessor = () => {
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`Type your message${
-                isAutoDetect ? " in any language (na you sabi if you type yoruba here)" : ""
+                isAutoDetect
+                  ? " in any language (na you sabi if you type yoruba here)"
+                  : ""
               }...`}
               className="w-full bg-transparent text-white px-3 py-2 sm:px-4 sm:py-3 resize-none min-h-[50px] sm:min-h-[60px] max-h-[150px] sm:max-h-[200px] outline-none text-sm sm:text-base"
               rows={1}
@@ -456,7 +478,7 @@ const TextProcessor = () => {
             <p className="text-[10px] sm:text-xs text-gray-400">
               {isAutoDetect
                 ? "🪄 Auto-detecting"
-                : `${language.flag} ${language.name}`}{" "}
+                : `${selectedLanguage.flag} ${selectedLanguage.name}`}{" "}
               • Press Enter to send
             </p>
           </div>

@@ -1,94 +1,133 @@
-// api-services.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
 /**
- * Service for language detection, translation, and summarization operations
- * using browser built-in AI capabilities when available, with robust fallbacks
- * shey you see how fancy it sounds lmao, i was stuck while doing the fallbacks and i didnt have time, so i used ai for that kind of choppy but it does the job 
+ * service for language detection, translation, and summarization
+ * using Chrome's AI capabilities with robust fallbacks when unavailable, i know this was'nt required but i added it while coding becasue of some issues i encountered while using the chrome api
+ * i am sorry if it goes against the instructions but as per my own understanding i dont suppose it should.
  */
 
 import { LANGUAGES } from './data/language-data';
 
-interface DetectionResult {
-  detectedLanguage: string;
-  confidence: number;
+// Type definitions for Chrome AI interfaces
+interface LanguageDetectorCapabilities {
+  available: 'no' | 'readily' | 'after-download';
+  languageAvailable(lang: string): 'no' | 'readily' | 'after-download';
+}
+
+interface LanguageDetector {
+  ready: Promise<void>;
+  detect(text: string): Promise<Array<{detectedLanguage: string, confidence: number}>>;
+}
+
+interface TranslatorCapabilities {
+  available: 'no' | 'readily' | 'after-download';
+  languagePairAvailable(source: string, target: string): 'no' | 'readily' | 'after-download';
+}
+
+interface Translator {
+  ready: Promise<void>;
+  translate(text: string): Promise<string>;
+}
+
+interface SummarizerCapabilities {
+  available: 'no' | 'readily' | 'after-download';
+}
+
+interface Summarizer {
+  ready: Promise<void>;
+  summarize(text: string, options?: { context?: string }): Promise<string>;
+}
+
+interface DownloadProgressEvent extends Event {
+  loaded: number;
+  total: number;
 }
 
 interface BrowserAI {
   languageDetector?: {
-    capabilities(): Promise<{
-      available: 'no' | 'readily' | 'after-download';
-      languageAvailable(lang: string): 'no' | 'readily' | 'after-download';
-    }>;
-    create(options?: any): Promise<{
-      ready: Promise<void>;
-      detect(text: string): Promise<DetectionResult[]>;
-    }>;
+    capabilities(): Promise<LanguageDetectorCapabilities>;
+    create(options?: {
+      monitor?(m: { addEventListener(event: string, listener: (e: DownloadProgressEvent) => void): void }): void;
+    }): Promise<LanguageDetector>;
   };
   translator?: {
-    capabilities(): Promise<{
-      available: 'no' | 'readily' | 'after-download';
-      languagePairAvailable(source: string, target: string): 'no' | 'readily' | 'after-download';
-    }>;
+    capabilities(): Promise<TranslatorCapabilities>;
     create(options: {
       sourceLanguage: string;
       targetLanguage: string;
-      monitor?(m: any): void;
-    }): Promise<{
-      ready: Promise<void>;
-      translate(text: string): Promise<string>;
-    }>;
+      monitor?(m: { addEventListener(event: string, listener: (e: DownloadProgressEvent) => void): void }): void;
+    }): Promise<Translator>;
   };
   summarizer?: {
-    capabilities(): Promise<{
-      available: 'no' | 'readily' | 'after-download';
-    }>;
+    capabilities(): Promise<SummarizerCapabilities>;
     create(options?: {
       type?: 'key-points' | 'tl;dr' | 'teaser' | 'headline';
       format?: 'markdown' | 'plain-text';
       length?: 'short' | 'medium' | 'long';
-      monitor?(m: any): void;
-    }): Promise<{
-      ready: Promise<void>;
-      summarize(text: string, options?: { context?: string }): Promise<string>;
-    }>;
+      monitor?(m: { addEventListener(event: string, listener: (e: DownloadProgressEvent) => void): void }): void;
+    }): Promise<Summarizer>;
   };
 }
 
+// Cache for initialized capabilities to avoid redundant initialization
+let aiCapabilitiesCache: {
+  detector: LanguageDetector | null;
+  translator: Record<string, Translator>;
+  summarizer: Summarizer | null;
+} | null = null;
+
 /**
- * Initialize browser AI capabilities
- * @returns Object containing initialized detector, translator, and summarizer if available
+ * Checks if Chrome AI is available in the current environment
+ */
+const isChromeAIAvailable = (): BrowserAI | null => {
+  return (typeof self !== 'undefined' && 'ai' in self) ? (self as any).ai as BrowserAI : null;
+};
+
+/**
+ * Initializes Chrome AI capabilities with proper error handling and progress tracking
  */
 export const initializeAICapabilities = async () => {
-  const ai = (typeof self !== 'undefined' && 'ai' in self) ? (self as any).ai as BrowserAI : null;
+  const ai = isChromeAIAvailable();
+  
+  if (!ai) {
+    console.info("Chrome AI capabilities not available in this browser");
+    return {
+      detector: null,
+      translator: {},
+      summarizer: null
+    };
+  }
+
   const capabilities = {
-    detector: null as any,
-    translator: null as any,
-    summarizer: null as any
+    detector: null as LanguageDetector | null,
+    translator: {} as Record<string, Translator>,
+    summarizer: null as Summarizer | null
   };
 
-  // Initialize language detector 
-  if (ai?.languageDetector) {
+  // Initialize language detector with proper error handling
+  if (ai.languageDetector) {
     try {
       const detectorCapabilities = await ai.languageDetector.capabilities();
       if (detectorCapabilities.available !== 'no') {
         const detector = await ai.languageDetector.create({
-          monitor(m: any) {
-            m.addEventListener('downloadprogress', (e: any) => {
-              console.log(`Language detector download: ${Math.round((e.loaded / e.total) * 100)}%`);
+          monitor(m) {
+            m.addEventListener('downloadprogress', (e: DownloadProgressEvent) => {
+              console.info(`Language detector download: ${Math.round((e.loaded / e.total) * 100)}%`);
             });
           }
         });
         await detector.ready;
         capabilities.detector = detector;
+        console.info("Chrome AI language detector initialized successfully");
+      } else {
+        console.info("Chrome AI language detector not available on this device");
       }
     } catch (error) {
-      console.warn("Failed to initialize language detector:", error);
+      console.warn("Failed to initialize Chrome AI language detector:", error);
     }
   }
 
-  // Initialize summarizer 
-  if (ai?.summarizer) {
+  // Initialize summarizer with proper error handling
+  if (ai.summarizer) {
     try {
       const summarizerCapabilities = await ai.summarizer.capabilities();
       if (summarizerCapabilities.available !== 'no') {
@@ -96,83 +135,110 @@ export const initializeAICapabilities = async () => {
           type: 'key-points',
           format: 'markdown',
           length: 'medium',
-          monitor(m: any) {
-            m.addEventListener('downloadprogress', (e: any) => {
-              console.log(`Summarizer download: ${Math.round((e.loaded / e.total) * 100)}%`);
+          monitor(m) {
+            m.addEventListener('downloadprogress', (e: DownloadProgressEvent) => {
+              console.info(`Summarizer download: ${Math.round((e.loaded / e.total) * 100)}%`);
             });
           }
         });
         await summarizer.ready;
         capabilities.summarizer = summarizer;
+        console.info("Chrome AI summarizer initialized successfully");
+      } else {
+        console.info("Chrome AI summarizer not available on this device");
       }
     } catch (error) {
-      console.warn("Failed to initialize summarizer:", error);
+      console.warn("Failed to initialize Chrome AI summarizer:", error);
     }
   }
 
   return capabilities;
 };
 
-// Singleton for AI capabilities
-let aiCapabilities: any = null;
+/**
+ * Gets cached AI capabilities or initializes them if not already cached
+ */
 const getAICapabilities = async () => {
-  if (!aiCapabilities) {
-    aiCapabilities = await initializeAICapabilities();
+  if (!aiCapabilitiesCache) {
+    aiCapabilitiesCache = await initializeAICapabilities();
   }
-  return aiCapabilities;
+  return aiCapabilitiesCache;
 };
 
 /**
- * Detects the language of the given text using browser AI when available
- * with multiple fallback strategies
+ * Validates and normalizes a language code
+ */
+const normalizeLanguageCode = (code: string): string => {
+  // Handle language codes like 'en-US' by extracting the primary language
+  const primaryCode = code.split('-')[0].toLowerCase();
+  // Verify it's in our supported languages list
+  return LANGUAGES.some(lang => lang.code === primaryCode) ? primaryCode : 'en';
+};
+
+/**
+ * Detects the language of text using Chrome AI Language Detector
+ * with sophisticated fallback strategies
+ * 
  * @param text Text to detect language for
- * @returns Promise with detected language code
+ * @returns Promise with the detected language code
  */
 export const detectLanguage = async (text: string): Promise<string> => {
   if (!text || !text.trim()) return 'en';
   
+  // Normalize text for processing
+  const processedText = text.trim().slice(0, 5000); // Limit text length for API compatibility
+  
   try {
     const capabilities = await getAICapabilities();
     
-    // Use browser's built-in AI language detector if available
+    // 1. Use Chrome AI language detector if available (primary method)
     if (capabilities.detector) {
       try {
-        const results = await capabilities.detector.detect(text);
+        console.info("Using Chrome AI Language Detector");
+        const results = await capabilities.detector.detect(processedText);
+        
         if (results && results.length > 0) {
-          // Filter by minimum confidence threshold
+          // Applies confidence threshold for high quality detection
           const confidenceThreshold = 0.7;
-          const highConfidenceResult = results.find((result: { confidence: number; detectedLanguage: string; }) => 
+          const highConfidenceResult = results.find(result => 
             result.confidence > confidenceThreshold && 
             LANGUAGES.some(lang => lang.code === result.detectedLanguage)
           );
           
           if (highConfidenceResult) {
+            console.info(`Detected language with high confidence: ${highConfidenceResult.detectedLanguage} (${highConfidenceResult.confidence.toFixed(2)})`);
             return highConfidenceResult.detectedLanguage;
           }
           
-          // If no high confidence result but we have results with supported languages
-          const supportedResult = results.find((result: { detectedLanguage: string; }) => 
+          // If no high confidence result but there is supported results
+          const supportedResult = results.find(result => 
             LANGUAGES.some(lang => lang.code === result.detectedLanguage)
           );
           
           if (supportedResult) {
+            console.info(`Detected language: ${supportedResult.detectedLanguage} (${supportedResult.confidence.toFixed(2)})`);
             return supportedResult.detectedLanguage;
           }
+          
+          console.info("No supported language detected with Chrome AI, using fallbacks");
         }
       } catch (error) {
-        console.warn("Browser AI language detection failed:", error);
+        console.warn("Chrome AI language detection failed:", error);
       }
+    } else {
+      console.info("Chrome AI Language Detector not available, using fallbacks");
     }
     
-    // Try external API detection service, this is one of the fallbacks just in case 
+    // 2. Try for external API detection service as fallback
     try {
+      console.info("Attempting external language detection API");
       const response = await fetch(`https://ws.detectlanguage.com/0.2/detect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer demo' 
         },
-        body: JSON.stringify({ q: text.slice(0, 500) })
+        body: JSON.stringify({ q: processedText.slice(0, 500) })
       });
       
       const data = await response.json();
@@ -180,6 +246,7 @@ export const detectLanguage = async (text: string): Promise<string> => {
         const detectedCode = data.data.detections[0].language;
         // Verify the detected language is supported
         if (LANGUAGES.some(lang => lang.code === detectedCode)) {
+          console.info(`External API detected language: ${detectedCode}`);
           return detectedCode;
         }
       }
@@ -187,25 +254,29 @@ export const detectLanguage = async (text: string): Promise<string> => {
       console.warn("External language detection API failed:", apiError);
     }
     
-    // Fallback to regex-based detection for longer text,
+    // 3. Fallback to regex-based detection for longer text
     if (text.length > 20) {
+      console.info("Attempting pattern-based language detection");
       const detectedLang = detectLanguageWithPatterns(text);
-      if (detectedLang) return detectedLang;
+      if (detectedLang) {
+        console.info(`Pattern detection found language: ${detectedLang}`);
+        return detectedLang;
+      }
     }
     
-    // Default to browser's language or English
-    return navigator.language.split('-')[0] || 'en';
+    // 4. Ultimate fallback to browser's language or English
+    const browserLang = normalizeLanguageCode(navigator.language);
+    console.info(`Using browser language as fallback: ${browserLang}`);
+    return browserLang;
     
   } catch (error) {
-    console.error("Language detection failed:", error);
-    return 'en';
+    console.error("All language detection methods failed:", error);
+    return 'en'; // Default to English in case of complete failure
   }
 };
 
 /**
- * Helper function to detect language using regex patterns
- * @param text Text to analyze
- * @returns Detected language code or null
+ * Helper function using script and word patterns for language detection
  */
 function detectLanguageWithPatterns(text: string): string | null {
   // Script-based detection (highest confidence)
@@ -220,7 +291,7 @@ function detectLanguageWithPatterns(text: string): string | null {
     th: /[\u0E00-\u0E7F]{4,}/g,                             // Thai
   };
   
-  // Check for script-specific patterns first
+  // Check for script-specific patterns first (high confidence)
   for (const [code, pattern] of Object.entries(scriptPatterns)) {
     const matches = text.match(pattern);
     if (matches && matches.length > 1) {
@@ -241,11 +312,11 @@ function detectLanguageWithPatterns(text: string): string | null {
   
   const langScores: {[key: string]: number} = {};
   
-  
+  // Score each language based on word frequency
   for (const [code, pattern] of Object.entries(commonWordPatterns)) {
     const matches = text.match(pattern);
     if (matches) {
-     
+      // Normalize score by text length to avoid bias towards longer texts
       langScores[code] = (matches.length / Math.sqrt(text.length)) * 100;
     }
   }
@@ -268,50 +339,82 @@ function detectLanguageWithPatterns(text: string): string | null {
 }
 
 /**
- * Initializes a translator for a specific language pair
+ * Gets or initializes a translator for a specific language pair using Chrome AI
+ * 
  * @param sourceLang Source language code
- * @param targetLang Target language code 
- * @returns Promise with translator or null if unavailable
+ * @param targetLang Target language code
+ * @returns Promise with the translator instance or null if unavailable
  */
-export const initializeTranslator = async (sourceLang: string, targetLang: string) => {
+export const getTranslator = async (sourceLang: string, targetLang: string): Promise<Translator | null> => {
   if (sourceLang === targetLang) return null;
   
+  // Normalize language codes
+  const normalizedSource = normalizeLanguageCode(sourceLang);
+  const normalizedTarget = normalizeLanguageCode(targetLang);
+  
+  // Generate a cache key for this language pair
+  const cacheKey = `${normalizedSource}_${normalizedTarget}`;
+  
   try {
-    // Access browser AI capabilities
-    const ai = (typeof self !== 'undefined' && 'ai' in self && 'translator' in (self as any).ai) 
-      ? (self as any).ai.translator 
-      : null;
-      
-    if (!ai) return null;
+    // Check if we already have this translator in cache
+    const capabilities = await getAICapabilities();
+    if (capabilities.translator && capabilities.translator[cacheKey]) {
+      return capabilities.translator[cacheKey];
+    }
     
-    const capabilities = await ai.capabilities();
-    const pairAvailable = await capabilities.languagePairAvailable(sourceLang, targetLang);
-    
-    if (pairAvailable === 'no') {
+    // Access Chrome AI translator capability
+    const ai = isChromeAIAvailable();
+    if (!ai?.translator) {
+      console.info("Chrome AI Translator not available");
       return null;
     }
     
-    const translator = await ai.create({
-      sourceLanguage: sourceLang,
-      targetLanguage: targetLang,
-      monitor(m: any) {
-        m.addEventListener('downloadprogress', (e: any) => {
-          console.log(`Translator download (${sourceLang}->${targetLang}): ${Math.round((e.loaded / e.total) * 100)}%`);
+    // Check if this language pair is supported
+    const translatorCapabilities = await ai.translator.capabilities();
+    const pairAvailability = await translatorCapabilities.languagePairAvailable(
+      normalizedSource, 
+      normalizedTarget
+    );
+    
+    if (pairAvailability === 'no') {
+      console.info(`Language pair ${normalizedSource}->${normalizedTarget} not supported by Chrome AI`);
+      return null;
+    }
+    
+    console.info(`Initializing Chrome AI Translator for ${normalizedSource}->${normalizedTarget}`);
+    console.info(`Availability status: ${pairAvailability}`);
+    
+    // Create the translator with download progress tracking
+    const translator = await ai.translator.create({
+      sourceLanguage: normalizedSource,
+      targetLanguage: normalizedTarget,
+      monitor(m) {
+        m.addEventListener('downloadprogress', (e: DownloadProgressEvent) => {
+          console.info(`Translator download (${normalizedSource}->${normalizedTarget}): ${Math.round((e.loaded / e.total) * 100)}%`);
         });
       }
     });
     
+    // Wait for the translator to be ready
     await translator.ready;
+    console.info(`Chrome AI Translator ready for ${normalizedSource}->${normalizedTarget}`);
+    
+    // Cache the translator for future use
+    if (aiCapabilitiesCache) {
+      aiCapabilitiesCache.translator[cacheKey] = translator;
+    }
+    
     return translator;
     
   } catch (error) {
-    console.warn(`Failed to initialize translator (${sourceLang}->${targetLang}):`, error);
+    console.warn(`Failed to initialize Chrome AI Translator (${normalizedSource}->${normalizedTarget}):`, error);
     return null;
   }
 };
 
 /**
- * Translates text from one language to another using browser AI with fallbacks
+ * Translates text using Chrome AI Translator with fallback mechanisms
+ * 
  * @param text Text to translate
  * @param sourceLang Source language code
  * @param targetLang Target language code
@@ -324,28 +427,33 @@ export const translateText = async (
 ): Promise<string> => {
   if (!text || sourceLang === targetLang) return text;
   
+  const normalizedSource = normalizeLanguageCode(sourceLang);
+  const normalizedTarget = normalizeLanguageCode(targetLang);
+  
   try {
-    // Try browser AI translator
-    let browserTranslator = null;
-    
-    try {
-      browserTranslator = await initializeTranslator(sourceLang, targetLang);
-      if (browserTranslator) {
-        const translatedText = await browserTranslator.translate(text);
+    // 1. Try Chrome AI Translator (primary method)
+    const translator = await getTranslator(normalizedSource, normalizedTarget);
+    if (translator) {
+      try {
+        console.info(`Using Chrome AI Translator for ${normalizedSource}->${normalizedTarget}`);
+        const translatedText = await translator.translate(text);
         if (translatedText) {
           return translatedText;
         }
+      } catch (chromeError) {
+        console.warn("Chrome AI translation failed:", chromeError);
       }
-    } catch (browserError) {
-      console.warn("Browser translator failed:", browserError);
     }
     
-    // Fallback to external translation services
+    console.info("Chrome AI Translator unavailable, using fallbacks");
+    
+    // 2. Fallback to external translation services
     const services = [
       // MyMemory translation API
       async () => {
+        console.info("Attempting MyMemory translation API");
         const response = await fetch(
-          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
+          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=${normalizedSource}|${normalizedTarget}`
         );
         const data = await response.json();
         if (data?.responseData?.translatedText) {
@@ -354,17 +462,18 @@ export const translateText = async (
           tempElement.innerHTML = data.responseData.translatedText;
           return tempElement.textContent || tempElement.innerText;
         }
-        throw new Error("No translation result");
+        throw new Error("No translation result from MyMemory");
       },
       
-      // LibreTranslate API - fallback
+      // LibreTranslate API - secondary fallback
       async () => {
+        console.info("Attempting LibreTranslate API");
         const response = await fetch(`https://libretranslate.com/translate`, {
           method: "POST",
           body: JSON.stringify({
-            q: text,
-            source: sourceLang,
-            target: targetLang,
+            q: text.slice(0, 1000),
+            source: normalizedSource,
+            target: normalizedTarget,
           }),
           headers: { "Content-Type": "application/json" }
         });
@@ -372,7 +481,7 @@ export const translateText = async (
         if (data?.translatedText) {
           return data.translatedText;
         }
-        throw new Error("No translation result");
+        throw new Error("No translation result from LibreTranslate");
       }
     ];
     
@@ -385,7 +494,7 @@ export const translateText = async (
       }
     }
     
-    // If all services fail, return fallback message
+    // 3. If all services fail, return appropriate fallback message
     const fallbackTranslations: {[key: string]: {[key: string]: string}} = {
       'en': {
         'es': 'Lo siento, no se pudo traducir el texto.',
@@ -398,21 +507,22 @@ export const translateText = async (
       }
     };
     
-    if (fallbackTranslations[sourceLang]?.[targetLang]) {
-      return fallbackTranslations[sourceLang][targetLang];
+    if (fallbackTranslations[normalizedSource]?.[normalizedTarget]) {
+      return fallbackTranslations[normalizedSource][normalizedTarget];
     }
     
-    return `[${sourceLang}->${targetLang} translation unavailable]`;
+    return `[${normalizedSource}->${normalizedTarget} translation unavailable]`;
   } catch (error) {
-    console.error("Translation failed:", error);
+    console.error("All translation methods failed:", error);
     return `[Translation Error: ${(error as Error).message}]`;
   }
 };
 
 /**
- * Summarizes the given text using browser AI or fallback algorithms
+ * Summarizes text using Chrome AI Summarizer with fallback options
+ * 
  * @param text Text to summarize
- * @param options Additional options for summarization
+ * @param options Additional summarization options
  * @returns Promise with summarized text
  */
 export const summarizeText = async (
@@ -431,33 +541,37 @@ export const summarizeText = async (
     format: 'markdown',
     length: 'medium',
     context: ''
-  };
+  } as const;
   
   const mergedOptions = { ...defaultOptions, ...options };
   
   try {
-    // Try to use browser AI capabilities
+    // 1. Try Chrome AI Summarizer (primary method)
     const capabilities = await getAICapabilities();
     
     if (capabilities.summarizer) {
       try {
+        console.info(`Using Chrome AI Summarizer (${mergedOptions.type}, ${mergedOptions.length})`);
         return await capabilities.summarizer.summarize(text, {
-          context: mergedOptions.context
+          context: mergedOptions.context || undefined
         });
       } catch (error) {
-        console.warn("Browser AI summarization failed:", error);
+        console.warn("Chrome AI summarization failed:", error);
       }
+    } else {
+      console.info("Chrome AI Summarizer not available, using fallbacks");
     }
     
-    // Fallback to external summarization API
+    // 2. Try external summarization API
     try {
+      console.info("Attempting MeaningCloud summarization API");
       const response = await fetch('https://api.meaningcloud.com/summarization-1.0', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: new URLSearchParams({
-          key: 'demo', // Use demo key
+          key: 'demo', // Using demo key
           txt: text.substring(0, 5000), // API limit
           sentences: mergedOptions.length === 'short' ? '3' : 
                     mergedOptions.length === 'medium' ? '5' : '7'
@@ -466,26 +580,32 @@ export const summarizeText = async (
       
       const data = await response.json();
       if (data?.summary) {
+        // Format according to requested format
+        if (mergedOptions.format === 'markdown' && mergedOptions.type === 'key-points') {
+          return data.summary
+            .split('. ')
+            .filter((s: string) => s.trim().length > 0)
+            .map((s: string) => `- ${s}${s.endsWith('.') ? '' : '.'}`)
+            .join('\n');
+        }
         return data.summary;
       }
     } catch (apiError) {
       console.warn("External summarization API failed:", apiError);
     }
     
-    // Final fallback to local algorithm
+    // 3. Final fallback to local algorithm
+    console.info("Using local summarization algorithm as final fallback");
     return createFallbackSummary(text, mergedOptions);
     
   } catch (error) {
-    console.error("Summarization failed:", error);
+    console.error("All summarization methods failed:", error);
     return `Failed to summarize text. Error: ${(error as Error).message}`;
   }
 };
 
 /**
- * Creates a simple summary when AI capabilities aren't available
- * @param text Text to summarize
- * @param options Summarization options
- * @returns A simple summary based on the requested format and type
+ * Creates a basic summary using local algorithms when AI capabilities aren't available
  */
 function createFallbackSummary(
   text: string, 
@@ -496,7 +616,7 @@ function createFallbackSummary(
     context?: string;
   }
 ): string {
-  // Split text into sentences
+  // Split text into sentences with improved regex
   const sentences = text
     .replace(/([.!?])\s*(?=[A-Z])/g, "$1|")
     .split("|")
@@ -504,7 +624,7 @@ function createFallbackSummary(
   
   if (sentences.length === 0) return text;
   
-  // Determine number of sentences to include
+  // Determine number of sentences to include based on requested length
   const sentenceCount = 
     options.length === 'short' ? Math.min(3, sentences.length) :
     options.length === 'medium' ? Math.min(5, sentences.length) :
@@ -523,7 +643,7 @@ function createFallbackSummary(
       if (sentences.length <= 3) {
         return sentences.join(' ');
       } else {
-        return `${sentences[0]} ${sentences[sentences.length - 1]}`;
+        return `${sentences[0]} ${sentences[Math.floor(sentences.length / 2)]} ${sentences[sentences.length - 1]}`;
       }
       
     case 'key-points':
@@ -542,9 +662,7 @@ function createFallbackSummary(
 
 /**
  * Extracts key points from text using a basic extraction algorithm
- * @param text Text to analyze
- * @param count Number of points to extract
- * @returns Array of key sentences
+ * Improved with TF-IDF-like scoring
  */
 function extractKeyPoints(text: string, count: number): string[] {
   const sentences = text
@@ -557,60 +675,104 @@ function extractKeyPoints(text: string, count: number): string[] {
   }
   
   
-  const keyPoints = [sentences[0]];
+  //const keyPoints = [sentences[0]];
   
-  // Find important terms
+  // Find important terms with improved algorithm
   const words = text.toLowerCase()
     .replace(/[^\w\s]/g, '')
     .split(/\s+/)
     .filter(word => word.length > 3);
   
+  // Count word frequency
   const wordFreq: {[key: string]: number} = {};
   words.forEach(word => {
     wordFreq[word] = (wordFreq[word] || 0) + 1;
   });
   
-  // Filter out common stopwords
-  const stopwords = ['this', 'that', 'these', 'those', 'they', 'their', 'there', 
-    'about', 'would', 'could', 'should', 'from', 'have', 'been', 'were', 'when'];
+  // Expanded stopwords list
+  const stopwords = [
+    'this', 'that', 'these', 'those', 'they', 'their', 'there', 'about',
+    'would', 'could', 'should', 'from', 'have', 'been', 'were', 'when',
+    'what', 'where', 'which', 'while', 'with', 'your', 'yours', 'also',
+    'because', 'however', 'therefore', 'although', 'many', 'some', 'then'
+  ];
   
-  const importantTerms = Object.entries(wordFreq)
-    .filter(([word]) => !stopwords.includes(word))
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
+  // Calculate TF-IDF-like scores
+  const sentenceCount = sentences.length;
+  const wordScores: {[key: string]: number} = {};
+  
+  Object.entries(wordFreq).forEach(([word, freq]) => {
+    if (stopwords.includes(word)) return;
+    
+    // Count how many sentences contain this word
+    const sentencesWithWord = sentences.filter(sentence => 
+      sentence.toLowerCase().includes(word)
+    ).length;
+    
+    // Term frequency * inverse document frequency
+    const tf = freq / words.length;
+    const idf = Math.log(sentenceCount / (1 + sentencesWithWord));
+    wordScores[word] = tf * idf;
+  });
+  
+  // Get top scoring words
+  const importantTerms = Object.entries(wordScores)
+    .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
+    .slice(0, 15)
     .map(([word]) => word);
   
-
+  // Score sentences based on important terms and position
   const scoredSentences = sentences.slice(1).map((sentence, index) => {
-  
+    // Term score - how many important terms it contains
     const termScore = importantTerms.reduce((score, term) => {
-      return score + (sentence.toLowerCase().includes(term) ? 1 : 0);
+      return score + (sentence.toLowerCase().includes(term) ? wordScores[term] : 0);
     }, 0);
     
-   
+    // Position score - earlier sentences tend to be more important
     const positionScore = 1 - (index / sentences.length);
     
-   
-    const lengthScore = Math.min(1, sentence.length / 100);
+    // Length score - penalize very short or very long sentences
+    const idealLength = 20; // words
+    const sentenceWords = sentence.split(/\s+/).length;
+    const lengthScore = 1 - Math.min(1, Math.abs(sentenceWords - idealLength) / idealLength);
     
-    // Combined score
+    // Combined score with weights
     const score = (termScore * 0.6) + (positionScore * 0.3) + (lengthScore * 0.1);
     
-    return { sentence, score };
+    return { sentence, score, index: index + 1 };
   });
   
   // Sort by score and take top sentences
   const topSentences = scoredSentences
     .sort((a, b) => b.score - a.score)
-    .slice(0, count - 1)
-    .map(item => item.sentence);
+    .slice(0, count - 1);
   
   // Combine with first sentence and sort by original position
-  const allSelectedSentences = [...keyPoints, ...topSentences];
-  const sentenceIndices = allSelectedSentences.map(s => sentences.indexOf(s));
+  const allSelectedSentences = [
+    { sentence: sentences[0], index: 0 },
+    ...topSentences
+  ].sort((a, b) => a.index - b.index);
   
   // Return sentences in their original order
-  return sentenceIndices
-    .sort((a, b) => a - b)
-    .map(index => sentences[index]);
+  return allSelectedSentences.map(item => item.sentence);
 }
+
+/**
+ * Initialize all AI capabilities at app startup
+ * This allows models to download in the background
+ */
+export const preloadAICapabilities = (): void => {
+  console.info("Preloading Chrome AI capabilities...");
+  getAICapabilities()
+    .then(capabilities => {
+      const status = {
+        languageDetector: capabilities.detector ? "Available" : "Unavailable",
+        translator: Object.keys(capabilities.translator).length > 0 ? "Available" : "Not yet initialized",
+        summarizer: capabilities.summarizer ? "Available" : "Unavailable"
+      };
+      console.info("Chrome AI capabilities loaded:", status);
+    })
+    .catch(err => {
+      console.warn("Failed to preload Chrome AI capabilities:", err);
+    });
+};

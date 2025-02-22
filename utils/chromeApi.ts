@@ -264,7 +264,6 @@ export const detectLanguage = async (text: string): Promise<string> => {
       }
     }
     
-    // 4. Ultimate fallback to browser's language or English
     const browserLang = normalizeLanguageCode(navigator.language);
     console.info(`Using browser language as fallback: ${browserLang}`);
     return browserLang;
@@ -562,39 +561,8 @@ export const summarizeText = async (
       console.info("Chrome AI Summarizer not available, using fallbacks");
     }
     
-    // 2. Try external summarization API
-    try {
-      console.info("Attempting MeaningCloud summarization API");
-      const response = await fetch('https://api.meaningcloud.com/summarization-1.0', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          key: 'demo', // Using demo key
-          txt: text.substring(0, 5000), // API limit
-          sentences: mergedOptions.length === 'short' ? '3' : 
-                    mergedOptions.length === 'medium' ? '5' : '7'
-        })
-      });
-      
-      const data = await response.json();
-      if (data?.summary) {
-        // Format according to requested format
-        if (mergedOptions.format === 'markdown' && mergedOptions.type === 'key-points') {
-          return data.summary
-            .split('. ')
-            .filter((s: string) => s.trim().length > 0)
-            .map((s: string) => `- ${s}${s.endsWith('.') ? '' : '.'}`)
-            .join('\n');
-        }
-        return data.summary;
-      }
-    } catch (apiError) {
-      console.warn("External summarization API failed:", apiError);
-    }
     
-    // 3. Final fallback to local algorithm
+    // 2. Final fallback to local algorithm
     console.info("Using local summarization algorithm as final fallback");
     return createFallbackSummary(text, mergedOptions);
     
@@ -616,7 +584,7 @@ function createFallbackSummary(
     context?: string;
   }
 ): string {
-  // Split text into sentences with improved regex
+  // Split text into sentences with regex
   const sentences = text
     .replace(/([.!?])\s*(?=[A-Z])/g, "$1|")
     .split("|")
@@ -697,7 +665,7 @@ function extractKeyPoints(text: string, count: number): string[] {
     'because', 'however', 'therefore', 'although', 'many', 'some', 'then'
   ];
   
-  // Calculate TF-IDF-like scores
+  // Calculate TF-IDF-like scores, i am not really sure how this operataes
   const sentenceCount = sentences.length;
   const wordScores: {[key: string]: number} = {};
   
@@ -759,7 +727,7 @@ function extractKeyPoints(text: string, count: number): string[] {
 
 /**
  * Initialize all AI capabilities at app startup
- * This allows models to download in the background
+ * This will allow the models download in the background
  */
 export const preloadAICapabilities = (): void => {
   console.info("Preloading Chrome AI capabilities...");

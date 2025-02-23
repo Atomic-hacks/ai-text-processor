@@ -152,7 +152,7 @@ export async function summarizeText(
 export async function initializeChromeAI(): Promise<void> {
   const ai = isChromeAIAvailable();
   if (!ai) {
-    throw new Error('Chrome AI not available in this browser');
+    throw new Error('Hwfa chief your browser doesnt support the chrome AI');
   }
 
   const capabilities = {
@@ -162,6 +162,6 @@ export async function initializeChromeAI(): Promise<void> {
   };
 
   if (Object.values(capabilities).every(cap => cap === 'no')) {
-    throw new Error('No Chrome AI capabilities available on this device');
+    throw new Error('Omo bro no AI for this your browser');
   }
 }

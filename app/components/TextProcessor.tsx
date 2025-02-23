@@ -156,14 +156,14 @@ import {
     };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">
+    <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-black to-neutral-900">
       <Dialog open={showIntro} onOpenChange={setShowIntro}>
-        <DialogContent className="sm:max-w-md animate-in slide-in-from-bottom duration-500">
+        <DialogContent className="sm:max-w-md animate-in slide-in-from-bottom duration-500 bg-gradient-to-b from-emerald-900 to-neutral-900 border-none text-white">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-black bg-clip-text text-transparent">
               Atomic Did Something
             </DialogTitle>
-            <DialogDescription className="text-lg">
+            <DialogDescription className="text-lg text-white">
               Experience the power of Chrome&apos;s built-in AI capabilities, that Atomic definitely did himself without using ChatGpt (nah seriously chatgpt sucks)
             </DialogDescription>
           </DialogHeader>
@@ -175,16 +175,16 @@ import {
             ].map((feature, index) => (
               <div 
                 key={index}
-                className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 transform hover:scale-105 transition-all duration-300"
+                className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-emerald-500 to-blacktransform hover:scale-105 transition-all duration-300"
               >
-                <feature.icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <feature.icon className="w-6 h-6 text-white " />
                 <span className="font-medium">{feature.text}</span>
               </div>
             ))}
           </div>
           <Button 
             onClick={() => setShowIntro(false)}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-300"
+            className="w-full bg-gradient-to-r from-emerald-600 to-neutral-800 hover:from-emerald-700 hover:to-black transform hover:scale-105 transition-all duration-300"
           >
             Get Started
           </Button>
@@ -195,18 +195,18 @@ import {
       {!capabilities.detector && !capabilities.translator && !capabilities.summarizer && (
         <Alert variant="destructive" className="m-4 animate-in slide-in-from-top duration-500">
           <AlertCircle className="h-5 w-5" />
-          <AlertTitle>Chrome AI Unavailable</AlertTitle>
+          <AlertTitle>Chrome AI is unvailable (in Davido&apos;s voice)</AlertTitle>
           <AlertDescription>
-            Please ensure you&apos;re using a supported version of Chrome with required flags enabled.
+            Please make sure you&apos;re using a supported version of Chrome with required flags enabled, or it wont work
           </AlertDescription>
         </Alert>
       )}
 
       {/* Mode Selection Header */}
-      <div className="sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800 p-4 space-y-3">
-        <div className="flex gap-2 max-w-md mx-auto">
+      <div className="sticky top-0 bg-black backdrop-blur-xl border-b border-gray-500  p-4 space-y-3">
+        <div className="flex gap-2 max-w-md mx-auto text-white">
           <Select value={mode} onValueChange={(value: any) => setMode(value)}>
-            <SelectTrigger className="bg-transparent border-2 hover:border-blue-500 transition-colors">
+            <SelectTrigger className="bg-transparent border-2 hover:border-cyan-500 transition-colors">
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +218,7 @@ import {
 
           {mode === 'translate' && (
             <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-              <SelectTrigger className="bg-transparent border-2 hover:border-blue-500 transition-colors">
+              <SelectTrigger className="bg-transparent border-2 hover:border-cyan-500 transition-colors">
                 <SelectValue placeholder="Target language" />
               </SelectTrigger>
               <SelectContent>
@@ -244,8 +244,8 @@ import {
               className={`
                 max-w-[85%] p-4 rounded-2xl shadow-sm
                 ${message.type === 'user' 
-                  ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white' 
-                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+                  ? 'bg-gradient-to-br from-emerald-500 to-neutral-600 text-white' 
+                  : 'bg-black text-white'
                 }
                 transform transition-all duration-300
                 animate-in slide-in-from-${message.type === 'user' ? 'right' : 'left'}
@@ -260,18 +260,18 @@ import {
       </div>
 
       {/* Input Form */}
-      <div className="sticky bottom-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-t border-gray-200 dark:border-gray-800 p-4">
+      <div className="sticky bottom-0 text-white bg-gradient-to-tr from-emerald-600 to-black backdrop-blur-3xl border-t border-gray-500 p-4">
         <form onSubmit={handleSubmit} className="flex gap-2 max-w-md mx-auto">
           <Input
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 bg-transparent border-2 focus:border-blue-500 transition-colors rounded-full px-6"
+            className="flex-1 bg-transparent border-2 focus:border-neutral-500 transition-colors rounded-full px-6"
           />
           <Button 
             type="submit" 
             disabled={!inputText.trim()}
-            className="rounded-full w-12 h-12 p-0 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform hover:scale-110 transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
+            className="rounded-full w-12 h-12 p-0 bg-gradient-to-r from-cyan-600 to-black hover:from-cyan-800 hover:to-black transform hover:scale-110 transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
           >
             <Send className="w-5 h-5" />
           </Button>
